@@ -9,9 +9,15 @@ License: MIT
 import random
 
 
+# Opposite houses.
 opposites = {i: j for i, j in zip(range(0, 6), range(12, 6, -1))}
 opposites.update({v: k for k, v in opposites.items()})
 # {0: 12, 1: 11, 2: 10, 3: 9, 4: 8, 5: 7, 7: 5, 8: 4, 9: 3, 10: 2, 11: 1, 12: 0}
+
+# opposites = dict(chain(
+#     zip(range(0, 6), range(12, 6, -1)),
+#     zip(range(12, 6, -1), range(0, 6))
+#     ))
 
 
 def move(board, house, player):
@@ -24,14 +30,6 @@ def move(board, house, player):
     else:
         move_again = False
 
-    # TODO: Ignore opponents store.
-#     for i in range(house+1, house+seeds+1):
-#         i %= len(board)
-#         if player == 0 and i == 13 or player == 1 and i == 6:
-#             continue
-#         board[i] += 1
-
-    # TODO: Opp capture doesn't work after a full round.
     i = house
     seeds_left = seeds
     while seeds_left > 0:
@@ -42,14 +40,15 @@ def move(board, house, player):
         board[idx] += 1
         seeds_left -= 1
 
-    board = capture_house(board, house, player, seeds)
+    if board[idx] == 1: # Last house was empty.
+        # idx is last seed index.
+        board = capture_house(board, house, player, seeds, idx)
 
     return board, move_again
 
 
-def capture_house(board, house, player_num, seeds):
-    """If last seed ends in empty house, take last + opponent seeds."""
-    last_seed_pos = (house + seeds) % len(board)
+def capture_house(board, house, player_num, seeds, last_seed_pos):
+    """If last seed ends in a empty house, take last + opponent seeds."""
     # May not capture in opponents house.
     if (player_num == 0 and last_seed_pos in range(7, 13) or
         player_num == 1 and last_seed_pos in range(0, 6)):
@@ -59,8 +58,9 @@ def capture_house(board, house, player_num, seeds):
         seeds_in_opp = board[opposites[last_seed_pos]] != 0
     else:
         seeds_in_opp = False
-    last_pos_not_store = last_seed_pos not in (6, 13)
-    if board[last_seed_pos] == 1 and last_pos_not_store and seeds_in_opp:
+
+    last_house_not_store = last_seed_pos not in (6, 13)
+    if last_house_not_store and seeds_in_opp:
         board[last_seed_pos] = 0
         store = 6 if player_num == 0 else 13
         board[store] += 1 + board[opposites[last_seed_pos]]
@@ -69,26 +69,27 @@ def capture_house(board, house, player_num, seeds):
 
 
 def print_board(board):
-    print('_' * 60)
-    print("house  '12'    '11'    '10'    '9'     '8'     '7'")
-    print("\t{}\t{}\t{}\t{}\t{}\t{}".format(*reversed(board[7:13])))
+    print('_' * 40)
+    print("  '12''11''10''9' '8' '7'  House numbers")
+    print("{:>4}{:>4}{:>4}{:>4}{:>4}{:>4}".format(*reversed(board[7:13])))
     print()
-    print("{}\t\t\t\t\t\t\t{}".format(board[13], board[6]))
+    print("{}{}{}   Stores".format(board[13], ' '*26, board[6]))
     print()
-    print("\t{}\t{}\t{}\t{}\t{}\t{}".format(*board[0:6]))
-    print("house  '0'     '1'     '2'     '3'     '4'     '5'")
-    print('_' * 60)
+    print("{:>4}{:>4}{:>4}{:>4}{:>4}{:>4}".format(*board[0:6]))
+    print("  '0' '1' '2' '3' '4' '5'  House numbers")
+    print('_' * 40)
 
 
 def main():
     player = 0
-    board = [6, 6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 0]
-    # board = [3, 3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 3, 3, 0]
-    print('Welcome to Kalah.')
-    print('Enter the number of the house to move the seeds counter-clockwise.')
-    print('Enter quit to stop the game.')
+#     board = [6, 6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 0]
+    board = [3, 3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 3, 3, 0]
+    print('Welcome to Kalah.\n'.rjust(30))
+    print('Enter the number of the house to')
+    print('move the seeds counter-clockwise.')
+    print('Enter quit or q to stop the game.\n')
     while True:
-        print('Player {}'.format(player + 1).rjust(30, ' '))
+        print('Player {}'.format(player + 1).rjust(20, ' '))
         print_board(board)
 
         inp = input('>>> ')
@@ -119,7 +120,7 @@ def main():
 
             # Determine winner.
             pl1, pl2 = board[6], board[13]
-            print(' ' * 20, end='')
+            print(' ' * 8, end='')
             if pl1 > pl2:
                 print('Player 1 is the winner.')
             elif pl2 > pl1:
