@@ -41,13 +41,12 @@ def move(board, house, player):
         seeds_left -= 1
 
     if board[idx] == 1: # Last house was empty.
-        # idx is last seed index.
-        board = capture_house(board, house, player, seeds, idx)
+        board = capture_house(board, player, last_seed_pos=idx)
 
     return board, move_again
 
 
-def capture_house(board, house, player_num, seeds, last_seed_pos):
+def capture_house(board, player_num, last_seed_pos):
     """If last seed ends in a empty house, take last + opponent seeds."""
     # May not capture in opponents house.
     if (player_num == 0 and last_seed_pos in range(7, 13) or
@@ -66,6 +65,11 @@ def capture_house(board, house, player_num, seeds, last_seed_pos):
         board[store] += 1 + board[opposites[last_seed_pos]]
         board[opposites[last_seed_pos]] = 0
     return board
+
+
+def ai_move(board):
+    filled_houses = [idx for idx in range(7, 13) if board[idx]]
+    return random.choice(filled_houses)
 
 
 def print_board(board):
@@ -88,11 +92,14 @@ def main():
     print('Enter the number of the house to')
     print('move the seeds counter-clockwise.')
     print('Enter quit or q to stop the game.\n')
+    print_board(board)
     while True:
         print('Player {}'.format(player + 1).rjust(20, ' '))
-        print_board(board)
-
-        inp = input('>>> ')
+        if player == 0:
+            inp = input('>>> ')
+        else:
+            inp = ai_move(board)
+            print('AI:', inp)
         if inp in ('quit', 'q'):
             break
         try:
@@ -106,8 +113,8 @@ def main():
             continue
 
         board, move_again = move(board, inp, player)
-        if move_again:
-            continue
+        print_board(board)
+
         # Game over.
         if not any(board[0:6]) or not any(board[7:13]):
             # Add remaining seeds to store.
@@ -118,19 +125,19 @@ def main():
                 board[6] += sum(board[0:6])
                 board[0:6] = [0] * 6
 
+            print_board(board)
             # Determine winner.
             pl1, pl2 = board[6], board[13]
             print(' ' * 8, end='')
             if pl1 > pl2:
-                print('Player 1 is the winner.')
+                input('Player 1 is the winner.')
             elif pl2 > pl1:
-                print('Player 2 is the winner.')
+                input('Player 2 is the winner.')
             else:
-                print('The game is a draw.')
-            print_board(board)
+                input('The game ended in a tie.')
             break
 
-        player = (player + 1) % 2
+        player = (player + 1) % 2 if not move_again else player
 
 
 if __name__ == "__main__":
