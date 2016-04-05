@@ -7,17 +7,14 @@ License: MIT
 """
 
 import random
+from operator import itemgetter
 
 
-# Opposite houses.
+__version__ = '0.1.0'
+
+# Opposite houses. {0: 12, 1: 11, 2: 10, etc.}
 opposites = {i: j for i, j in zip(range(0, 6), range(12, 6, -1))}
 opposites.update({v: k for k, v in opposites.items()})
-# {0: 12, 1: 11, 2: 10, 3: 9, 4: 8, 5: 7, 7: 5, 8: 4, 9: 3, 10: 2, 11: 1, 12: 0}
-
-# opposites = dict(chain(
-#     zip(range(0, 6), range(12, 6, -1)),
-#     zip(range(12, 6, -1), range(0, 6))
-#     ))
 
 
 def move(board, house, player):
@@ -48,6 +45,7 @@ def move(board, house, player):
 
 def capture_house(board, player_num, last_seed_pos):
     """If last seed ends in a empty house, take last + opponent seeds."""
+    board = board.copy()
     # May not capture in opponents house.
     if (player_num == 0 and last_seed_pos in range(7, 13) or
         player_num == 1 and last_seed_pos in range(0, 6)):
@@ -67,9 +65,52 @@ def capture_house(board, player_num, last_seed_pos):
     return board
 
 
-def ai_move(board):
-    filled_houses = [idx for idx in range(7, 13) if board[idx]]
-    return random.choice(filled_houses)
+def ai_move(board, position=1):
+    """AI move.
+
+    Args:
+        position (int): 0 if player 1; 1 if player2.
+    """
+    # Houses with seeds.
+    possible_moves = [house for house in range(7, 13) if board[house]]
+    # Rate moves.
+    ratings = []
+    for house in possible_moves:
+        seeds = board[house]
+        can_score = seeds + house > 12
+        can_score_with_bonus = seeds + house == 13
+        target_house = (seeds + house) % len(board)
+        target_house_empty = board[target_house] == 0
+        target_not_store = target_house in range(7, 13)
+        if target_not_store:
+            seeds_in_opp = opposites[target_house] != 0
+        else:
+            seeds_in_opp = False
+        can_capture = target_house_empty and target_not_store and seeds_in_opp
+        if can_capture:
+            ratings.append([house, 4])
+        elif can_score_with_bonus:
+            ratings.append([house, 3])
+        elif can_score:
+            ratings.append([house, 2])
+
+#     if position == 1:  # player2
+#         filled_houses = [house for house in range(7, 13) if board[house]]
+#         # Find empty houses and check if AI can end their turn in one.
+#         empty_houses = [house for house in range(7, 13) if board[house] == 0]
+#         capture_moves = []
+#         for house in empty_houses:
+#             for idx, seeds in enumerate(board[7:13], 7):
+#                 if idx + seeds == house and seeds > 0:
+#                     capture_moves.append(idx)
+#     else:  # player1
+#         filled_houses = [house for house in range(0, 6) if board[house]]
+#         empty_houses = [house for house in range(0, 6) if board[house] == 0]
+    if ratings:
+        print(sorted(ratings, key=itemgetter(1), reverse=True))
+        return sorted(ratings, key=itemgetter(1), reverse=True)[0][0]
+    else:
+        return random.choice(possible_moves)
 
 
 def print_board(board):
