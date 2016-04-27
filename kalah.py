@@ -45,19 +45,20 @@ def move(board, house, player):
 
 def capture_house(board, player_num, last_seed_pos):
     """If last seed ends in a empty house, take last + opponent seeds."""
-    board = board.copy()
     # May not capture in opponents house.
     if (player_num == 0 and last_seed_pos in range(7, 13) or
         player_num == 1 and last_seed_pos in range(0, 6)):
         return board
+
+    board = board.copy()
     # May not capture if 0 seeds in opponents house.
-    if last_seed_pos not in (6, 13):
+    last_house_is_not_store = last_seed_pos not in (6, 13)
+    if last_house_is_not_store:
         seeds_in_opp = board[opposites[last_seed_pos]] != 0
     else:
         seeds_in_opp = False
 
-    last_house_not_store = last_seed_pos not in (6, 13)
-    if last_house_not_store and seeds_in_opp:
+    if last_house_is_not_store and seeds_in_opp:
         board[last_seed_pos] = 0
         store = 6 if player_num == 0 else 13
         board[store] += 1 + board[opposites[last_seed_pos]]
@@ -71,44 +72,41 @@ def ai_move(board, position=1):
     Args:
         position (int): 0 if player 1; 1 if player2.
     """
+    if position == 0:
+        own_houses = range(0, 6)
+        store = 6
+        highest_house = 5
+    else:
+        own_houses = range(7, 13)
+        store = 13
+        highest_house = 12
+        
     # Houses with seeds.
-    possible_moves = [house for house in range(7, 13) if board[house]]
+    possible_moves = [house for house in own_houses if board[house]]
     # Rate moves.
-    ratings = []
+    weighted_moves = []
     for house in possible_moves:
         seeds = board[house]
-        can_score = seeds + house > 12
-        can_score_with_bonus = seeds + house == 13
+        can_score = seeds + house > highest_house
+        can_score_with_bonus = seeds + house == store
         target_house = (seeds + house) % len(board)
         target_house_empty = board[target_house] == 0
-        target_not_store = target_house in range(7, 13)
+        target_not_store = target_house in own_houses
         if target_not_store:
             seeds_in_opp = opposites[target_house] != 0
         else:
             seeds_in_opp = False
         can_capture = target_house_empty and target_not_store and seeds_in_opp
         if can_capture:
-            ratings.append([house, 4])
+            weighted_moves.append([house, 4])
         elif can_score_with_bonus:
-            ratings.append([house, 3])
+            weighted_moves.append([house, 3])
         elif can_score:
-            ratings.append([house, 2])
+            weighted_moves.append([house, 2])
 
-#     if position == 1:  # player2
-#         filled_houses = [house for house in range(7, 13) if board[house]]
-#         # Find empty houses and check if AI can end their turn in one.
-#         empty_houses = [house for house in range(7, 13) if board[house] == 0]
-#         capture_moves = []
-#         for house in empty_houses:
-#             for idx, seeds in enumerate(board[7:13], 7):
-#                 if idx + seeds == house and seeds > 0:
-#                     capture_moves.append(idx)
-#     else:  # player1
-#         filled_houses = [house for house in range(0, 6) if board[house]]
-#         empty_houses = [house for house in range(0, 6) if board[house] == 0]
-    if ratings:
-        print(sorted(ratings, key=itemgetter(1), reverse=True))
-        return sorted(ratings, key=itemgetter(1), reverse=True)[0][0]
+    if weighted_moves:
+        print(sorted(weighted_moves, key=itemgetter(1), reverse=True))
+        return sorted(weighted_moves, key=itemgetter(1), reverse=True)[0][0]
     else:
         return random.choice(possible_moves)
 
@@ -125,22 +123,73 @@ def print_board(board):
     print('_' * 40)
 
 
+def get_human_players():
+    while True:
+        print('Enter number of human players (0, 1, 2)')
+        human_players = input('>>> ')
+        if human_players in ('0', '1', '2'):
+            return int(human_players)
+        else:
+            print('Invalid input.')
+
+
+def get_seeds():
+    print('Enter number of seeds per house (3-6): ')
+    while True:
+        try:
+            seed_number = int(input('>>> '))
+        except ValueError:
+            print('Invalid input. Enter a number between 3 and 6.')
+            continue
+        if seed_number in range(3, 7):
+            return seed_number
+        else:
+            print('Invalid input. Enter a number between 3 and 6.')
+
+
 def main():
-    player = 0
-#     board = [6, 6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 0]
-    board = [3, 3, 3, 3, 3, 3, 0, 3, 3, 3, 3, 3, 3, 0]
+    # TODO: Allow second player to switch sides after first move.
     print('Welcome to Kalah.\n'.rjust(30))
     print('Enter the number of the house to')
     print('move the seeds counter-clockwise.')
     print('Enter quit or q to stop the game.\n')
-    print_board(board)
-    while True:
-        print('Player {}'.format(player + 1).rjust(20, ' '))
-        if player == 0:
-            inp = input('>>> ')
+    human_players = get_human_players()
+    if human_players == 1:
+        player1 = random.choice(('human', 'ai'))
+        if player1 == 'human':
+            player2 = 'ai'
         else:
-            inp = ai_move(board)
-            print('AI:', inp)
+            player2 = 'human'
+    elif human_players == 0:
+        player1 = 'ai'
+        player2 = 'ai'
+    else:
+        player1 = 'human'
+        player2 = 'human'
+
+    seed_number = get_seeds()
+
+    board = [seed_number] * 14
+    board[6] = 0
+    board[13] = 0
+    print_board(board)
+
+    current_player = 0
+    while True:
+        print('Player {}'.format(current_player + 1).rjust(20, ' '))
+        if current_player == 0:
+            if player1 == 'human':
+                inp = input('>>> ')
+            else:
+                inp = ai_move(board, position=0)
+                print('AI:', inp)
+        else:
+            if player2 == 'human':
+                inp = input('>>> ')
+            else:
+                inp = ai_move(board, position=1)
+                print('AI:', inp)
+
         if inp in ('quit', 'q'):
             break
         try:
@@ -148,12 +197,12 @@ def main():
         except ValueError:
             print('Invalid input.')
             continue
-        if (player == 0 and inp not in range(0, 6) or
-            player == 1 and inp not in range(7, 13) or board[inp] == 0):
+        if (current_player== 0 and inp not in range(0, 6) or
+            current_player== 1 and inp not in range(7, 13) or board[inp] == 0):
             print('Invalid input.')
             continue
 
-        board, move_again = move(board, inp, player)
+        board, move_again = move(board, inp, current_player)
         print_board(board)
 
         # Game over.
@@ -178,7 +227,8 @@ def main():
                 input('The game ended in a tie.')
             break
 
-        player = (player + 1) % 2 if not move_again else player
+        if not move_again:
+            current_player = (current_player + 1) % 2
 
 
 if __name__ == "__main__":
