@@ -10,22 +10,26 @@ import random
 from operator import itemgetter
 
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 # Opposite houses. {0: 12, 1: 11, 2: 10, etc.}
-opposites = {i: j for i, j in zip(range(0, 6), range(12, 6, -1))}
-opposites.update({v: k for k, v in opposites.items()})
+OPPOSITES = dict(zip(range(0, 6), range(12, 6, -1)))
+OPPOSITES.update({v: k for k, v in OPPOSITES.items()})
 
 
 def move(board, house, player):
+    """Move the seeds from selected house counter-clockwise.
+
+    Args:
+        board (list): The game board.
+        house (int): Index of the selected house.
+        player (int): 0 is Player 1; 1 is Player 2.
+    """
     seeds = board[house]
     board[house] = 0
 
     # Move again if last seed ends up in store.
-    if house + seeds in (6, 13):
-        move_again = True
-    else:
-        move_again = False
+    move_again = house + seeds in (6, 13)
 
     i = house
     seeds_left = seeds
@@ -46,30 +50,37 @@ def move(board, house, player):
 def capture_house(board, player_num, last_seed_pos):
     """If last seed ends in a empty house, take last + opponent seeds."""
     # May not capture in opponents house.
-    if (player_num == 0 and last_seed_pos in range(7, 13) or
-        player_num == 1 and last_seed_pos in range(0, 6)):
+    if (player_num == 0 and last_seed_pos in range(7, 13)
+            or player_num == 1 and last_seed_pos in range(0, 6)):
         return board
 
     board = board.copy()
     # May not capture if 0 seeds in opponents house.
     last_house_is_not_store = last_seed_pos not in (6, 13)
     if last_house_is_not_store:
-        seeds_in_opp = board[opposites[last_seed_pos]] != 0
+        seeds_in_opp = board[OPPOSITES[last_seed_pos]] != 0
     else:
         seeds_in_opp = False
 
     if last_house_is_not_store and seeds_in_opp:
         board[last_seed_pos] = 0
         store = 6 if player_num == 0 else 13
-        board[store] += 1 + board[opposites[last_seed_pos]]
-        board[opposites[last_seed_pos]] = 0
+        board[store] += 1 + board[OPPOSITES[last_seed_pos]]
+        board[OPPOSITES[last_seed_pos]] = 0
     return board
 
 
-def ai_move(board, position=1):
-    """AI move.
+def ai_move(board, position):
+    """Find the best move for the ai player.
+
+    Give weights to possible moves.
+    Capturing opponents house has highest priority,
+    then scoring with bonus turn,
+    just scoring has lowest priority (except for
+    random moves).
 
     Args:
+        board (list): The game board.
         position (int): 0 if player 1; 1 if player2.
     """
     if position == 0:
@@ -80,7 +91,7 @@ def ai_move(board, position=1):
         own_houses = range(7, 13)
         store = 13
         highest_house = 12
-        
+
     # Houses with seeds.
     possible_moves = [house for house in own_houses if board[house]]
     # Rate moves.
@@ -93,7 +104,7 @@ def ai_move(board, position=1):
         target_house_empty = board[target_house] == 0
         target_not_store = target_house in own_houses
         if target_not_store:
-            seeds_in_opp = opposites[target_house] != 0
+            seeds_in_opp = OPPOSITES[target_house] != 0
         else:
             seeds_in_opp = False
         can_capture = target_house_empty and target_not_store and seeds_in_opp
@@ -134,7 +145,7 @@ def get_human_players():
 
 
 def get_seeds():
-    print('Enter number of seeds per house (3-6): ')
+    print('Enter number of seeds per house (3-6)')
     while True:
         try:
             seed_number = int(input('>>> '))
@@ -147,11 +158,10 @@ def get_seeds():
             print('Invalid input. Enter a number between 3 and 6.')
 
 
-def main():
-    # TODO: Allow second player to switch sides after first move.
+def setup():
+    """Get players, seeds and create board."""
     print('Welcome to Kalah.\n'.rjust(30))
-    print('Enter the number of the house to')
-    print('move the seeds counter-clockwise.')
+    print('Enter the number of the house to move the seeds counter-clockwise.')
     print('Enter quit or q to stop the game.\n')
     human_players = get_human_players()
     if human_players == 1:
@@ -173,22 +183,37 @@ def main():
     board[6] = 0
     board[13] = 0
     print_board(board)
+    return player1, player2, board
 
+
+def determine_winner(board):
+    """Return the winner announcement."""
+    pl1, pl2 = board[6], board[13]
+    if pl1 > pl2:
+        return 'Player 1 is the winner.'
+    elif pl2 > pl1:
+        return 'Player 2 is the winner.'
+    else:
+        return 'The game ended in a tie.'
+
+
+def game_over(board):
+    return not any(board[0:6]) or not any(board[7:13])
+
+
+def main():
+    """Setup, run main loop and determine winner."""
+    player1, player2, board = setup()
     current_player = 0
     while True:
-        print('Player {}'.format(current_player + 1).rjust(20, ' '))
-        if current_player == 0:
-            if player1 == 'human':
-                inp = input('>>> ')
-            else:
-                inp = ai_move(board, position=0)
-                print('AI:', inp)
+        print('Player {}'.format(current_player + 1))
+
+        active_player = player1 if current_player == 0 else player2
+        if active_player == 'human':
+            inp = input('>>> ')
         else:
-            if player2 == 'human':
-                inp = input('>>> ')
-            else:
-                inp = ai_move(board, position=1)
-                print('AI:', inp)
+            inp = ai_move(board, position=current_player)
+            print('AI:', inp)
 
         if inp in ('quit', 'q'):
             break
@@ -197,16 +222,16 @@ def main():
         except ValueError:
             print('Invalid input.')
             continue
-        if (current_player== 0 and inp not in range(0, 6) or
-            current_player== 1 and inp not in range(7, 13) or board[inp] == 0):
-            print('Invalid input.')
+        if (current_player == 0 and inp not in range(0, 6)
+                or current_player == 1 and inp not in range(7, 13)
+                or board[inp] == 0):
+            print('Invalid move.')
             continue
 
         board, move_again = move(board, inp, current_player)
         print_board(board)
 
-        # Game over.
-        if not any(board[0:6]) or not any(board[7:13]):
+        if game_over(board):
             # Add remaining seeds to store.
             if not any(board[0:6]):
                 board[13] += sum(board[7:13])
@@ -216,19 +241,12 @@ def main():
                 board[0:6] = [0] * 6
 
             print_board(board)
-            # Determine winner.
-            pl1, pl2 = board[6], board[13]
-            print(' ' * 8, end='')
-            if pl1 > pl2:
-                input('Player 1 is the winner.')
-            elif pl2 > pl1:
-                input('Player 2 is the winner.')
-            else:
-                input('The game ended in a tie.')
             break
 
         if not move_again:
             current_player = (current_player + 1) % 2
+
+    input('{:^40}'.format(determine_winner(board)))
 
 
 if __name__ == "__main__":
