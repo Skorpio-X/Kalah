@@ -116,7 +116,6 @@ def ai_move(board, position):
             weighted_moves.append([house, 2])
 
     if weighted_moves:
-        print(sorted(weighted_moves, key=itemgetter(1), reverse=True))
         return sorted(weighted_moves, key=itemgetter(1), reverse=True)[0][0]
     else:
         return random.choice(possible_moves)
@@ -213,7 +212,7 @@ def main():
             inp = input('>>> ')
         else:
             inp = ai_move(board, position=current_player)
-            print('AI:', inp)
+            print('AI move:', inp)
 
         if inp in ('quit', 'q'):
             break
