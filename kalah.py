@@ -10,11 +10,16 @@ import random
 from operator import itemgetter
 
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 # Opposite houses. {0: 12, 1: 11, 2: 10, etc.}
 OPPOSITES = dict(zip(range(0, 6), range(12, 6, -1)))
 OPPOSITES.update({v: k for k, v in OPPOSITES.items()})
+# Houses, store, highest house.
+PLAYER_DATA = {
+    0: (range(0, 6), 6, 5),
+    1: (range(7, 13), 13, 12)
+    }
 
 
 def move(board, house, player):
@@ -26,6 +31,9 @@ def move(board, house, player):
         player (int): 0 is Player 1; 1 is Player 2.
     """
     seeds = board[house]
+#     target_house = (seeds + house) % len(board)
+#     target_house_empty = board[target_house] == 0
+#     target_not_store = target_house in own_houses
     board[house] = 0
 
     # Move again if last seed ends up in store.
@@ -42,35 +50,39 @@ def move(board, house, player):
         seeds_left -= 1
 
     if board[idx] == 1: # Last house was empty.
-        board = capture_house(board, player, last_seed_pos=idx)
+        if can_capture_house(board, player, last_seed_pos=idx):
+            board = capture_house(board, player, last_seed_pos=idx)
 
     return board, move_again
 
 
-def capture_house(board, player_num, last_seed_pos):
-    """If last seed ends in a empty house, take last + opponent seeds."""
-    # May not capture in opponents house.
-    if (player_num == 0 and last_seed_pos in range(7, 13)
-            or player_num == 1 and last_seed_pos in range(0, 6)):
-        return board
+def can_capture_house(board, player, last_seed_pos):
+    """Determine if capturing a house is possible.
 
+    May not capture in opponents house or store.
+    Can capture if seeds are in opponents house.
+
+    Args:
+        last_seed_pos (int): Index of the last placed seed.
+            Works only if the house was empty.
+    """
+    opp_houses = range(7, 13) if player == 0 else range(0, 6)
+    if last_seed_pos in opp_houses or last_seed_pos in (6, 13):
+        return False
+    return board[OPPOSITES[last_seed_pos]] != 0
+
+
+def capture_house(board, player, last_seed_pos):
+    """Move last seed and opposite seeds to own store."""
     board = board.copy()
-    # May not capture if 0 seeds in opponents house.
-    last_house_is_not_store = last_seed_pos not in (6, 13)
-    if last_house_is_not_store:
-        seeds_in_opp = board[OPPOSITES[last_seed_pos]] != 0
-    else:
-        seeds_in_opp = False
-
-    if last_house_is_not_store and seeds_in_opp:
-        board[last_seed_pos] = 0
-        store = 6 if player_num == 0 else 13
-        board[store] += 1 + board[OPPOSITES[last_seed_pos]]
-        board[OPPOSITES[last_seed_pos]] = 0
+    board[last_seed_pos] = 0
+    store = 6 if player == 0 else 13
+    board[store] += 1 + board[OPPOSITES[last_seed_pos]]
+    board[OPPOSITES[last_seed_pos]] = 0
     return board
 
 
-def ai_move(board, position):
+def ai_move(board, player):
     """Find the best move for the ai player.
 
     Give weights to possible moves.
@@ -81,16 +93,9 @@ def ai_move(board, position):
 
     Args:
         board (list): The game board.
-        position (int): 0 if player 1; 1 if player2.
+        player (int): 0 if player 1; 1 if player2.
     """
-    if position == 0:
-        own_houses = range(0, 6)
-        store = 6
-        highest_house = 5
-    else:
-        own_houses = range(7, 13)
-        store = 13
-        highest_house = 12
+    own_houses, store, highest_house = PLAYER_DATA[player]
 
     # Houses with seeds.
     possible_moves = [house for house in own_houses if board[house]]
@@ -116,12 +121,14 @@ def ai_move(board, position):
             weighted_moves.append([house, 2])
 
     if weighted_moves:
+        print(sorted(weighted_moves, key=itemgetter(1), reverse=True))
         return sorted(weighted_moves, key=itemgetter(1), reverse=True)[0][0]
     else:
         return random.choice(possible_moves)
 
 
 def print_board(board):
+    """Print the board."""
     print('_' * 40)
     print("  '12''11''10''9' '8' '7'  House numbers")
     print("{:>4}{:>4}{:>4}{:>4}{:>4}{:>4}".format(*reversed(board[7:13])))
@@ -134,6 +141,7 @@ def print_board(board):
 
 
 def get_human_players():
+    """Player can enter if 0, 1 or 2 human players take part."""
     while True:
         print('Enter number of human players (0, 1, 2)')
         human_players = input('>>> ')
@@ -144,6 +152,7 @@ def get_human_players():
 
 
 def get_seeds():
+    """Player needs to enter seeds per house."""
     print('Enter number of seeds per house (3-6)')
     while True:
         try:
@@ -197,6 +206,7 @@ def determine_winner(board):
 
 
 def game_over(board):
+    """Return True if all houses on one side are empty."""
     return not any(board[0:6]) or not any(board[7:13])
 
 
@@ -211,19 +221,18 @@ def main():
         if active_player == 'human':
             inp = input('>>> ')
         else:
-            inp = ai_move(board, position=current_player)
+            inp = ai_move(board, current_player)
             print('AI move:', inp)
 
         if inp in ('quit', 'q'):
-            break
+            return
         try:
             inp = int(inp)
         except ValueError:
             print('Invalid input.')
             continue
-        if (current_player == 0 and inp not in range(0, 6)
-                or current_player == 1 and inp not in range(7, 13)
-                or board[inp] == 0):
+        own_houses = PLAYER_DATA[current_player][0]
+        if inp not in own_houses or board[inp] == 0:
             print('Invalid move.')
             continue
 
