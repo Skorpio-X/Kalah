@@ -15,7 +15,7 @@ __version__ = '0.1.2'
 # Opposite houses. {0: 12, 1: 11, 2: 10, etc.}
 OPPOSITES = dict(zip(range(0, 6), range(12, 6, -1)))
 OPPOSITES.update({v: k for k, v in OPPOSITES.items()})
-# Houses, store, highest house.
+# Player: Houses, store, highest house
 PLAYER_DATA = {
     0: (range(0, 6), 6, 5),
     1: (range(7, 13), 13, 12)
@@ -31,9 +31,6 @@ def move(board, house, player):
         player (int): 0 is Player 1; 1 is Player 2.
     """
     seeds = board[house]
-#     target_house = (seeds + house) % len(board)
-#     target_house_empty = board[target_house] == 0
-#     target_not_store = target_house in own_houses
     board[house] = 0
 
     # Move again if last seed ends up in store.
@@ -82,6 +79,19 @@ def capture_house(board, player, last_seed_pos):
     return board
 
 
+def find_target_house(house, seeds):
+    """Find the target house of a choosen house."""
+    player = 0 if house in range(0, 6) else 1
+    opp_store = 6 if player == 1 else 13
+    target = house
+    for _ in range(0, seeds):
+        if target + 1 == opp_store:
+            target = (target+2) % 14
+        else:
+            target = (target+1) % 14
+    return target
+
+
 def ai_move(board, player):
     """Find the best move for the ai player.
 
@@ -105,7 +115,7 @@ def ai_move(board, player):
         seeds = board[house]
         can_score = seeds + house > highest_house
         can_score_with_bonus = seeds + house == store
-        target_house = (seeds + house) % len(board)
+        target_house = find_target_house(house, seeds)
         target_house_empty = board[target_house] == 0
         target_not_store = target_house in own_houses
         if target_not_store:
