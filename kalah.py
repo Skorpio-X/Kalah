@@ -10,15 +10,15 @@ import random
 from operator import itemgetter
 
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 # Opposite houses. {0: 12, 1: 11, 2: 10, etc.}
 OPPOSITES = dict(zip(range(0, 6), range(12, 6, -1)))
 OPPOSITES.update({v: k for k, v in OPPOSITES.items()})
-# Player: Houses, store, highest house
+# Player: Houses, store.
 PLAYER_DATA = {
-    0: (range(0, 6), 6, 5),
-    1: (range(7, 13), 13, 12)
+    0: (range(0, 6), 6),
+    1: (range(7, 13), 13)
     }
 
 
@@ -32,23 +32,22 @@ def move(board, house, player):
     """
     seeds = board[house]
     board[house] = 0
+    store = PLAYER_DATA[player][1]
+    opp_store = 13 if player == 0 else 6
 
     # Move again if last seed ends up in store.
-    move_again = house + seeds in (6, 13)
+    move_again = find_target_house(house, seeds) == store
 
-    i = house
-    seeds_left = seeds
-    while seeds_left > 0:
-        i += 1
-        idx = i % len(board)
-        if player == 0 and idx == 13 or player == 1 and idx == 6:
+    while seeds > 0:
+        house = (house + 1) % len(board)
+        if house == opp_store:
             continue
-        board[idx] += 1
-        seeds_left -= 1
+        board[house] += 1
+        seeds -= 1
 
-    if board[idx] == 1: # Last house was empty.
-        if can_capture_house(board, player, last_seed_pos=idx):
-            board = capture_house(board, player, last_seed_pos=idx)
+    if board[house] == 1:  # Last house was empty.
+        if can_capture_house(board, player, last_seed_pos=house):
+            board = capture_house(board, player, last_seed_pos=house)
 
     return board, move_again
 
@@ -60,6 +59,8 @@ def can_capture_house(board, player, last_seed_pos):
     Can capture if seeds are in opponents house.
 
     Args:
+        board (list): The game board.
+        player (int): 0 or 1
         last_seed_pos (int): Index of the last placed seed.
             Works only if the house was empty.
     """
@@ -83,52 +84,66 @@ def find_target_house(house, seeds):
     """Find the target house of a choosen house."""
     player = 0 if house in range(0, 6) else 1
     opp_store = 6 if player == 1 else 13
-    target = house
     for _ in range(0, seeds):
-        if target + 1 == opp_store:
-            target = (target+2) % 14
+        if house + 1 == opp_store:
+            house = (house+2) % 14
         else:
-            target = (target+1) % 14
-    return target
+            house = (house+1) % 14
+    return house
 
 
-def ai_move(board, player):
-    """Find the best move for the ai player.
+def weigh_moves(board, own_houses, store, possible_moves):
+    """Give weights to possible moves.
 
-    Give weights to possible moves.
-    Capturing opponents house has highest priority,
-    then scoring with bonus turn,
-    just scoring has lowest priority (except for
+    Capturing opponents house has highest priority (4),
+    then scoring with bonus turn (3),
+    just scoring has lowest priority (2) (except for
     random moves).
 
     Args:
-        board (list): The game board.
-        player (int): 0 if player 1; 1 if player2.
-    """
-    own_houses, store, highest_house = PLAYER_DATA[player]
+        board (list): Game board.
+        own_houses (range): Houses of the player.
+        store (int): The store of the player.
+        possible_moves (list): Houses with seeds.
 
-    # Houses with seeds.
-    possible_moves = [house for house in own_houses if board[house]]
-    # Rate moves.
+    Return:
+        weighted_moves (list[tuple]): Houses with their weight.
+    """
     weighted_moves = []
     for house in possible_moves:
         seeds = board[house]
-        can_score = seeds + house > highest_house
+        can_score = seeds + house > store
         can_score_with_bonus = seeds + house == store
         target_house = find_target_house(house, seeds)
         target_house_empty = board[target_house] == 0
-        target_not_store = target_house in own_houses
-        if target_not_store:
-            seeds_in_opp = OPPOSITES[target_house] != 0
+        if target_house in own_houses:
+            seeds_in_opp = board[OPPOSITES[target_house]] != 0
         else:
             seeds_in_opp = False
-        can_capture = target_house_empty and target_not_store and seeds_in_opp
+
+        can_capture = (target_house_empty and target_house in own_houses
+                       and seeds_in_opp)
         if can_capture:
             weighted_moves.append([house, 4])
         elif can_score_with_bonus:
             weighted_moves.append([house, 3])
         elif can_score:
             weighted_moves.append([house, 2])
+    return weighted_moves
+
+
+def ai_move(board, player):
+    """Find the best move for the ai player.
+
+    Args:
+        board (list): The game board.
+        player (int): 0 if player 1; 1 if player2.
+    """
+    own_houses, store = PLAYER_DATA[player]
+
+    # Houses with seeds.
+    possible_moves = [house for house in own_houses if board[house]]
+    weighted_moves = weigh_moves(board, own_houses, store, possible_moves)
 
     if weighted_moves:
         print(sorted(weighted_moves, key=itemgetter(1), reverse=True))
